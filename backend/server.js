@@ -29,29 +29,38 @@ connectDB();
 
 const app = express();
 
-// Security and utility middleware
+// Security middleware
 app.use(helmet());
-const clientUrl = process.env.CLIENT_URL;
+
+// Allowed frontend URLs
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
-  clientUrl,
-  clientUrl ? clientUrl.replace(/\/$/, '') : null
+  process.env.CLIENT_URL,
 ].filter(Boolean);
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-}));
+// CORS configuration
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log('Blocked by CORS:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  })
+);
+
+// Body parser middleware
 app.use(express.json());
+
+// Cookie parser middleware
 app.use(cookieParser());
 
+// Logger middleware
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
@@ -69,15 +78,36 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/learning', learningRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req, res) => res.json({ status: 'ok', message: 'SkillPath AI API is running' }));
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'SkillPath AI API is running',
+  });
+});
 
-// Serve frontend in production (optional for monolithic deployments)
+// Serve frontend only for monolithic production deployments
 if (process.env.NODE_ENV === 'production') {
   const __dirname = path.resolve();
-  app.use(express.static(path.join(__dirname, '../skillpath-frontend/dist')));
-  app.get('*', (req, res) => res.sendFile(path.resolve(__dirname, '../skillpath-frontend/dist', 'index.html')));
+
+  app.use(
+    express.static(
+      path.join(__dirname, '../skillpath-frontend/dist')
+    )
+  );
+
+  app.get('*', (req, res) => {
+    res.sendFile(
+      path.resolve(
+        __dirname,
+        '../skillpath-frontend/dist',
+        'index.html'
+      )
+    );
+  });
 } else {
-  app.get('/', (req, res) => res.send('API is running....'));
+  app.get('/', (req, res) => {
+    res.send('API is running....');
+  });
 }
 
 // Error Handling Middleware
@@ -87,5 +117,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(
+    `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`
+  );
 });
